@@ -5,6 +5,7 @@ namespace mesh {
 
 void Mesh::begin() {
   Dispatcher::begin();
+  lastCommunicationMillis = 0;
 }
 
 void Mesh::loop() {
@@ -43,6 +44,8 @@ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
     MESH_DEBUG_PRINTLN("%s Mesh::onRecvPacket(): unsupported packet version", getLogDateTime());
     return ACTION_RELEASE;
   }
+
+  lastCommunicationMillis = _ms->getMillis();
 
   if (pkt->isRouteDirect() && pkt->getPayloadType() == PAYLOAD_TYPE_TRACE) {
     if (pkt->path_len < MAX_PATH_SIZE) {
@@ -359,6 +362,7 @@ void Mesh::routeDirectRecvAcks(Packet* packet, uint32_t delay_millis) {
         a1->header &= ~PH_ROUTE_MASK;
         a1->header |= ROUTE_TYPE_DIRECT;
         sendPacket(a1, 0, delay_millis);
+        lastCommunicationMillis = _ms->getMillis();
       }
       extra--;
     }
@@ -369,6 +373,7 @@ void Mesh::routeDirectRecvAcks(Packet* packet, uint32_t delay_millis) {
       a2->header &= ~PH_ROUTE_MASK;
       a2->header |= ROUTE_TYPE_DIRECT;
       sendPacket(a2, 0, delay_millis);
+      lastCommunicationMillis = _ms->getMillis();
     }
   }
 }
@@ -608,6 +613,7 @@ void Mesh::sendFlood(Packet* packet, uint32_t delay_millis) {
     pri = 1;
   }
   sendPacket(packet, pri, delay_millis);
+  lastCommunicationMillis = _ms->getMillis();
 }
 
 void Mesh::sendDirect(Packet* packet, const uint8_t* path, uint8_t path_len, uint32_t delay_millis) {
@@ -632,6 +638,7 @@ void Mesh::sendDirect(Packet* packet, const uint8_t* path, uint8_t path_len, uin
   }
   _tables->hasSeen(packet); // mark this packet as already sent in case it is rebroadcast back to us
   sendPacket(packet, pri, delay_millis);
+  lastCommunicationMillis = _ms->getMillis();
 }
 
 void Mesh::sendZeroHop(Packet* packet, uint32_t delay_millis) {
@@ -643,6 +650,7 @@ void Mesh::sendZeroHop(Packet* packet, uint32_t delay_millis) {
   _tables->hasSeen(packet); // mark this packet as already sent in case it is rebroadcast back to us
 
   sendPacket(packet, 0, delay_millis);
+  lastCommunicationMillis = _ms->getMillis();
 }
 
 bool Mesh::hasTimingCriticalWork() {
@@ -669,6 +677,10 @@ bool Mesh::hasTimingCriticalWork() {
 bool Mesh::hasImmediateWork() const {
     return _mgr->getOutboundCount(_ms->getMillis()) > 0 ||
            _mgr->getNextInbound(_ms->getMillis()) != NULL;
+}
+
+uint32_t Mesh::getLastCommunicationAge() {
+  return _ms->getMillis() - lastCommunicationMillis;
 }
 
 } // end namespace mesh

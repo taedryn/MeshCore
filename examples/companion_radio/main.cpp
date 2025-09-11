@@ -1,6 +1,7 @@
 #include <Arduino.h>   // needed for PlatformIO
 #include <Mesh.h>
 #include "MyMesh.h"
+#include <target.h>
 
 // Believe it or not, this std C function is busted on some platforms!
 static uint32_t _atoi(const char* sp) {
@@ -263,7 +264,24 @@ bool hasPendingWork() {
 
   return false;
 }
- 
+
+bool canStandbyRadio() {
+  static bool is_in_standby = false;
+  uint32_t now = millis();
+  uint32_t last_comm_age = the_mesh.getLastCommunicationAge();
+
+  // don't hit standby too often, to avoid "race" condition where
+  // incoming RX is killed by an overeager standby call
+  if (last_comm_age > (LORA_STANDBY_DELAY * 1000) && !is_in_standby) {
+    is_in_standby = true;
+    return true;
+  }
+  else {
+    is_in_standby = false;
+  }
+  return false;
+}
+
 void loop() {
   the_mesh.loop();
   sensors.loop();
@@ -279,6 +297,9 @@ void loop() {
    */
   if (!hasPendingWork()) {
     __WFE();
+  }
+  if (canStandbyRadio()) {
+      radio_standby();
   }
 #endif
 }

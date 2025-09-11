@@ -27,6 +27,7 @@ class Mesh : public Dispatcher {
   RTCClock* _rtc;
   RNG* _rng;
   MeshTables* _tables;
+  uint32_t lastCommunicationMillis;
 
   void removeSelfFromPath(Packet* packet);
   void routeDirectRecvAcks(Packet* packet, uint32_t delay_millis);
@@ -46,6 +47,12 @@ public:
    *         right now
   */
   virtual bool hasImmediateWork() const;
+
+  /**
+   * \brief  Return the millisecond count since the last communication
+   *         activity. This tracks both receive and transmit activity.
+  */
+  virtual uint32_t getLastCommunicationAge();
 
 
 protected:
