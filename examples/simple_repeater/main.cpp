@@ -84,6 +84,42 @@ void setup() {
   the_mesh.sendSelfAdvertisement(16000);
 }
 
+
+static uint32_t last_activity_time = 0;
+
+bool hasPendingWork() {
+  static uint32_t last_serial_check = 0;
+  uint32_t now = millis();
+
+  // limit serial checks to every 200 ms: Serial.available() prevents
+  // sleep
+  if (now - last_serial_check > 200) {
+    last_serial_check = now;
+    if (Serial.available() > 0) {
+      last_activity_time = now;
+      return true;
+    }
+  }
+
+  if (the_mesh.hasImmediateWork()) {
+    last_activity_time = now;
+    return true;
+  }
+
+  if (the_mesh.hasTimingCriticalWork() || now - last_activity_time < 20) {
+    return true;
+  }
+
+#ifdef DISPLAY_CLASS
+  // this is currently only stubbed out, always returns false
+  if (ui_task.hasPendingUpdates()) {
+    return true;
+  }
+#endif
+
+  return false;
+}
+
 void loop() {
   int len = strlen(command);
   while (Serial.available() && len < sizeof(command)-1) {
@@ -114,4 +150,17 @@ void loop() {
 #ifdef DISPLAY_CLASS
   ui_task.loop();
 #endif
+#ifdef HELTEC_T114 // limit sleep mode to t114 for now
+  /* sleep if no pending work
+   * will wake on:
+   * - SysTick every 1ms (used for millis() function)
+   * - Radio/BLE interrupts
+   * - button interrupt
+   * - serial data pending
+   */
+  if (!hasPendingWork()) {
+    __WFE();
+  }
+#endif
+
 }
